@@ -125,7 +125,7 @@ export default function FullPageCanvas() {
         src="/hero-bg.mp4"
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
         style={{ backgroundColor: '#0a0a0a' }}
       />
@@ -136,7 +136,7 @@ export default function FullPageCanvas() {
         src="/tunnel-bg.mp4"
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
         style={{ backgroundColor: '#0a0a0a', opacity: 0 }}
       />

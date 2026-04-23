@@ -40,16 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Veo frame sequence (83MB — serve from CDN in production)
-public/frames/
-public/tunnel-frames/
-public/workspace-frames/
-
-# Scroll recording videos (heavy WebM + MP4)
-public/scroll-videos/
-
-# Ambient background video
-public/ambient-bg.mp4
-
 # Capture scripts (dev only)
 scripts/
