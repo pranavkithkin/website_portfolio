@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="36" viewBox="0 0 180 36" fill="none">
+  <!-- S lettermark -->
+  <rect x="0" y="6" width="24" height="24" rx="4" fill="#1C1C1C"/>
+  <path d="M7 18.5C7 18.5 8.5 15 12 15C15.5 15 17 17 14.5 19C12 21 10 21.5 10 24C10 26.5 12 28 15 28" stroke="#FAFAF8" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M7 14C7 14 9.5 8 14 8C16.5 8 18 10 17 12" stroke="#C9B99A" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Wordmark -->
+  <text x="32" y="25" font-family="'Playfair Display', Georgia, serif" font-size="18" font-weight="700" fill="#1C1C1C" letter-spacing="-0.3">SynopsLabs</text>
+  <!-- AI badge -->
+  <rect x="142" y="14" width="22" height="10" rx="3" fill="#1C1C1C"/>
+  <text x="146" y="22" font-family="Inter, sans-serif" font-size="7" font-weight="600" fill="#FAFAF8" letter-spacing="0.3">AI</text>
+</svg>

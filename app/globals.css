@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+───────────────────────────────────────────────────────────── */
+:root {
+  --bg: #FAFAF8;
+  --surface: #FFFFFF;
+  --foreground: #1C1C1C;
+  --text-muted: #6B6B7B;
+  --accent: #1C1C1C;
+  --accent-warm: #C9B99A;
+  --border: rgba(28, 28, 28, 0.12);
+  --wa-green: #25D366;
+
+  /* spacing */
+  --section-py: clamp(5rem, 10vw, 8rem);
+  --container-px: clamp(1.25rem, 5vw, 4rem);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RESET + BASE
+───────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* No scroll-behavior:smooth — it conflicts with RAF-driven canvas scrolling */
+}
+
+body {
+  background-color: #0a0a0a; /* Dark base — canvas is always behind */
+  color: var(--foreground);
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS */
+}
+
+/* GPU compositing hint for sections */
+section {
+  will-change: auto;
+}
+
+/* Lazy-render offscreen content — massive paint savings */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TYPOGRAPHY UTILITIES
+───────────────────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
+}
+
+.font-body {
+  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+}
+
+.text-hero {
+  font-size: clamp(3rem, 7vw, 6rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.text-section {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.text-card-title {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CONTAINER
+───────────────────────────────────────────────────────────── */
+.container-main {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: var(--container-px);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SECTION SPACING
+───────────────────────────────────────────────────────────── */
+.section-padding {
+  padding-block: var(--section-py);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SCROLLBAR
+───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--accent-warm);
+  border-radius: 3px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SELECTION
+───────────────────────────────────────────────────────────── */
+::selection {
+  background: var(--accent-warm);
+  color: var(--foreground);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   REDUCED MOTION
+───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SCROLL CANVAS — RESPONSIVE HEIGHTS (from 3d-scroll-website skill)
+───────────────────────────────────────────────────────────── */
+.scroll-animation {
+  height: 400vh;
+}
+@media (max-width: 1024px) {
+  .scroll-animation { height: 350vh !important; }
+}
+@media (max-width: 768px) {
+  .scroll-animation { height: 300vh !important; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CSS CIRCUIT PATH ANIMATION (offset-path dots)
+───────────────────────────────────────────────────────────── */
+@keyframes cpu-path-animation {
+  0%   { offset-distance: 0%; }
+  100% { offset-distance: 100%; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3D CARD PERSPECTIVE UTILITY
+───────────────────────────────────────────────────────────── */
+.card-3d {
+  perspective: 800px;
+}
+.card-3d-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease;
+}
+.card-3d:hover .card-3d-inner {
+  transform: rotateX(-4deg) rotateY(4deg) translateZ(8px);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LENIS SMOOTH SCROLL
+───────────────────────────────────────────────────────────── */
+html.lenis {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   VIDEO LOADING ANIMATIONS
+───────────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
