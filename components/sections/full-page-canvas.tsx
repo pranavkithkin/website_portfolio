@@ -3,11 +3,11 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * OPTIMIZED full-page 3D background.
+ * Full-page 3D background — scroll-driven video scrubbing.
  * 
- * Uses 2 short MP4 videos (~5MB total) with scroll-driven currentTime.
- * Videos must be fully buffered for random seeking to work — we use
- * preload="auto" + explicit load() + canplaythrough event.
+ * Uses 2 high-quality MP4 videos (1920p, CRF 23) with scroll-driven currentTime.
+ * Videos preload="auto" ensures they buffer fully for smooth random seeking.
+ * Cache-Control: immutable headers in next.config.ts ensure CDN edge caching.
  */
 
 export default function FullPageCanvas() {
@@ -44,35 +44,29 @@ export default function FullPageCanvas() {
     const hero = heroRef.current;
     const tunnel = tunnelRef.current;
 
-    // Hero video
     if (hero) {
-      const onReady = () => {
-        ready.current.hero = true;
-        updateProgress();
-      };
+      const onReady = () => { ready.current.hero = true; updateProgress(); };
       hero.addEventListener('canplaythrough', onReady, { once: true });
-      if (hero.readyState >= 4) onReady();
-      // Explicitly trigger load for CDN
+      // Also listen for 'loadeddata' as fallback (some browsers fire this first)
+      hero.addEventListener('loadeddata', onReady, { once: true });
+      if (hero.readyState >= 3) onReady();
       hero.load();
     }
 
-    // Tunnel video
     if (tunnel) {
-      const onReady = () => {
-        ready.current.tunnel = true;
-        updateProgress();
-      };
+      const onReady = () => { ready.current.tunnel = true; updateProgress(); };
       tunnel.addEventListener('canplaythrough', onReady, { once: true });
-      if (tunnel.readyState >= 4) onReady();
+      tunnel.addEventListener('loadeddata', onReady, { once: true });
+      if (tunnel.readyState >= 3) onReady();
       tunnel.load();
     }
 
-    // Safety timeout — show content after 5s regardless
+    // Safety timeout — show content after 6s regardless
     const timeout = setTimeout(() => {
       ready.current.hero = true;
       ready.current.tunnel = true;
       updateProgress();
-    }, 5000);
+    }, 6000);
 
     return () => clearTimeout(timeout);
   }, []);
@@ -136,7 +130,7 @@ export default function FullPageCanvas() {
 
   return (
     <>
-      {/* Hero background video — scroll-driven */}
+      {/* Hero background video — scroll-driven, full quality 1920p */}
       <video
         ref={heroRef}
         src="/hero-bg.mp4"
@@ -147,7 +141,7 @@ export default function FullPageCanvas() {
         style={{ backgroundColor: '#0a0a0a' }}
       />
 
-      {/* Tunnel background video — scroll-driven */}
+      {/* Tunnel background video — scroll-driven, full quality 1920p */}
       <video
         ref={tunnelRef}
         src="/tunnel-bg.mp4"
@@ -204,7 +198,7 @@ export default function FullPageCanvas() {
           fontSize: 10, letterSpacing: '0.35em', textTransform: 'uppercase',
           color: 'rgba(250,250,248,0.25)', fontFamily: 'monospace',
         }}>
-          Loading experience
+          Loading 3D experience
         </p>
       </div>
     </>
