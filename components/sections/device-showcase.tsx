@@ -40,13 +40,11 @@ export default function DeviceShowcase() {
       aria-label="Device showcase"
     >
       <div className="sticky top-0 h-screen overflow-hidden">
-        {/* Dark glass background */}
+        {/* Clean dark background — no blur */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundColor: 'rgba(10,10,10,0.7)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
+            backgroundColor: '#0a0a0a',
           }}
         />
 
