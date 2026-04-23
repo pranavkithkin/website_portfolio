@@ -5,9 +5,9 @@ import { useEffect, useRef } from 'react';
 /**
  * OPTIMIZED full-page 3D background.
  * 
- * Instead of loading 384 individual frame images (57MB, 384 HTTP requests),
- * this uses 2 short MP4 videos (~5MB total) with scroll-driven currentTime.
- * Video decoding is GPU-accelerated → smoother + 10x lighter.
+ * Uses 2 short MP4 videos (~5MB total) with scroll-driven currentTime.
+ * Videos must be fully buffered for random seeking to work — we use
+ * preload="auto" + explicit load() + canplaythrough event.
  */
 
 export default function FullPageCanvas() {
@@ -16,6 +16,7 @@ export default function FullPageCanvas() {
   const scrollY = useRef(0);
   const docHeight = useRef(1);
   const rafId = useRef(0);
+  const ready = useRef({ hero: false, tunnel: false });
 
   // Loading overlay refs
   const loadOverlay = useRef<HTMLDivElement>(null);
@@ -24,15 +25,12 @@ export default function FullPageCanvas() {
 
   // ── Track video readiness & show loading ──────────────────────────────────
   useEffect(() => {
-    let heroReady = false;
-    let tunnelReady = false;
+    const updateProgress = () => {
+      const pct = (ready.current.hero ? 50 : 0) + (ready.current.tunnel ? 50 : 0);
+      if (loadBar.current) loadBar.current.style.width = pct + '%';
+      if (loadPct.current) loadPct.current.textContent = pct + '%';
 
-    const checkReady = () => {
-      const total = (heroReady ? 50 : 0) + (tunnelReady ? 50 : 0);
-      if (loadBar.current) loadBar.current.style.width = total + '%';
-      if (loadPct.current) loadPct.current.textContent = total + '%';
-
-      if (heroReady && tunnelReady) {
+      if (ready.current.hero && ready.current.tunnel) {
         if (loadOverlay.current) {
           loadOverlay.current.style.pointerEvents = 'none';
           loadOverlay.current.style.opacity = '0';
@@ -46,24 +44,35 @@ export default function FullPageCanvas() {
     const hero = heroRef.current;
     const tunnel = tunnelRef.current;
 
+    // Hero video
     if (hero) {
-      const h = () => { heroReady = true; checkReady(); };
-      hero.addEventListener('canplaythrough', h, { once: true });
-      // Fallback: if video loads fast
-      if (hero.readyState >= 4) h();
-    }
-    if (tunnel) {
-      const t = () => { tunnelReady = true; checkReady(); };
-      tunnel.addEventListener('canplaythrough', t, { once: true });
-      if (tunnel.readyState >= 4) t();
+      const onReady = () => {
+        ready.current.hero = true;
+        updateProgress();
+      };
+      hero.addEventListener('canplaythrough', onReady, { once: true });
+      if (hero.readyState >= 4) onReady();
+      // Explicitly trigger load for CDN
+      hero.load();
     }
 
-    // Safety timeout — show content after 4s regardless
+    // Tunnel video
+    if (tunnel) {
+      const onReady = () => {
+        ready.current.tunnel = true;
+        updateProgress();
+      };
+      tunnel.addEventListener('canplaythrough', onReady, { once: true });
+      if (tunnel.readyState >= 4) onReady();
+      tunnel.load();
+    }
+
+    // Safety timeout — show content after 5s regardless
     const timeout = setTimeout(() => {
-      heroReady = true;
-      tunnelReady = true;
-      checkReady();
-    }, 4000);
+      ready.current.hero = true;
+      ready.current.tunnel = true;
+      updateProgress();
+    }, 5000);
 
     return () => clearTimeout(timeout);
   }, []);
@@ -82,26 +91,34 @@ export default function FullPageCanvas() {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
 
+    let lastKey = '';
+
     const loop = () => {
       const progress = docHeight.current > 0
         ? Math.min(1, Math.max(0, scrollY.current / docHeight.current))
         : 0;
 
       if (progress < 0.5) {
-        // Hero phase: 0–50% scroll
         const heroProgress = progress / 0.5;
-        hero.style.opacity = '1';
-        tunnel.style.opacity = '0';
-        if (hero.duration) {
-          hero.currentTime = heroProgress * hero.duration;
+        const key = `h-${Math.round(heroProgress * 1000)}`;
+        if (key !== lastKey) {
+          lastKey = key;
+          hero.style.opacity = '1';
+          tunnel.style.opacity = '0';
+          if (hero.duration && ready.current.hero) {
+            hero.currentTime = heroProgress * hero.duration;
+          }
         }
       } else {
-        // Tunnel phase: 50–100% scroll
         const tunnelProgress = (progress - 0.5) / 0.5;
-        hero.style.opacity = '0';
-        tunnel.style.opacity = '1';
-        if (tunnel.duration) {
-          tunnel.currentTime = tunnelProgress * tunnel.duration;
+        const key = `t-${Math.round(tunnelProgress * 1000)}`;
+        if (key !== lastKey) {
+          lastKey = key;
+          hero.style.opacity = '0';
+          tunnel.style.opacity = '1';
+          if (tunnel.duration && ready.current.tunnel) {
+            tunnel.currentTime = tunnelProgress * tunnel.duration;
+          }
         }
       }
 
@@ -125,7 +142,7 @@ export default function FullPageCanvas() {
         src="/hero-bg.mp4"
         muted
         playsInline
-        preload="metadata"
+        preload="auto"
         className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
         style={{ backgroundColor: '#0a0a0a' }}
       />
@@ -136,7 +153,7 @@ export default function FullPageCanvas() {
         src="/tunnel-bg.mp4"
         muted
         playsInline
-        preload="metadata"
+        preload="auto"
         className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
         style={{ backgroundColor: '#0a0a0a', opacity: 0 }}
       />
