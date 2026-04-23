@@ -4,7 +4,6 @@ import { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { MessageCircle } from 'lucide-react';
 import { getWhatsAppLink } from '@/lib/utils';
-import { CircuitPaths, OrbitBadge, RotatingCube } from '@/components/ui/3d-assets';
 
 const REGIONS = [
   { flag: '🇦🇪', name: 'UAE', active: true },
@@ -22,9 +21,6 @@ export default function Contact() {
       className="relative overflow-hidden py-24 md:py-36"
       style={{ backgroundColor: '#111111' }}
     >
-      {/* SVG circuit path animation — full background */}
-      <CircuitPaths />
-
       {/* Subtle gradient vignette */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -35,12 +31,8 @@ export default function Contact() {
       />
 
       <div className="container-main relative z-10" ref={ref}>
-        {/* Orbit badges around center */}
-        <div className="relative mx-auto mb-16 flex h-64 w-64 items-center justify-center md:mb-20">
-          <OrbitBadge label="UAE · India · KSA" radius={110} duration={14} startAngle={0} />
-          <OrbitBadge label="200+ Projects Live" radius={80} duration={9} startAngle={90} />
-
-          {/* Center orb */}
+        {/* Center orb */}
+        <div className="relative mx-auto mb-16 flex h-40 w-40 items-center justify-center md:mb-20">
           <motion.div
             animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
