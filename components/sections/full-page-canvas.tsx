@@ -1,36 +1,108 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 /**
- * Full-page 3D background — scroll-driven video scrubbing.
+ * Full-page 3D background — canvas-based frame painting.
  * 
- * Uses 2 high-quality MP4 videos (1920p, CRF 23) with scroll-driven currentTime.
- * Videos preload="auto" ensures they buffer fully for smooth random seeking.
- * Cache-Control: immutable headers in next.config.ts ensure CDN edge caching.
+ * Preloads JPG frame sequences and paints them to a fixed canvas on scroll.
+ * Canvas drawImage is instant (no decode lag like video.currentTime).
+ * 
+ * Hero: 96 frames — golden wireframe zoom-in (first half of scroll)
+ * Tunnel: 96 frames — tunnel fly-through (second half of scroll)
  */
 
+const HERO_COUNT = 96;
+const TUNNEL_COUNT = 96;
+
+function heroPath(i: number) {
+  return `/frames/frame_${String(i + 1).padStart(4, '0')}.jpg`;
+}
+function tunnelPath(i: number) {
+  return `/tunnel-frames/frame-${String(i + 1).padStart(4, '0')}.jpg`;
+}
+
 export default function FullPageCanvas() {
-  const heroRef = useRef<HTMLVideoElement>(null);
-  const tunnelRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const heroFrames = useRef<HTMLImageElement[]>([]);
+  const tunnelFrames = useRef<HTMLImageElement[]>([]);
   const scrollY = useRef(0);
   const docHeight = useRef(1);
   const rafId = useRef(0);
-  const ready = useRef({ hero: false, tunnel: false });
+  const lastFrame = useRef(-1);
 
   // Loading overlay refs
   const loadOverlay = useRef<HTMLDivElement>(null);
   const loadBar = useRef<HTMLDivElement>(null);
   const loadPct = useRef<HTMLSpanElement>(null);
 
-  // ── Track video readiness & show loading ──────────────────────────────────
+  // ── Paint a frame to canvas ───────────────────────────────────────────────
+  const paint = useCallback((img: HTMLImageElement) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !img.complete || !img.naturalWidth) return;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+
+    // Cover fit
+    const scale = Math.max(cw / iw, ch / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    const dx = (cw - dw) / 2;
+    const dy = (ch - dh) / 2;
+
+    ctx.drawImage(img, dx, dy, dw, dh);
+  }, []);
+
+  // ── Resize canvas to viewport ─────────────────────────────────────────────
   useEffect(() => {
-    const updateProgress = () => {
-      const pct = (ready.current.hero ? 50 : 0) + (ready.current.tunnel ? 50 : 0);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = '100vw';
+      canvas.style.height = '100vh';
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  // ── Preload frames with progressive loading ──────────────────────────────
+  useEffect(() => {
+    const totalFrames = HERO_COUNT + TUNNEL_COUNT;
+    let loaded = 0;
+
+    // Load key frames first (every 8th), then fill in the rest
+    const keyIndices: number[] = [];
+    const fillIndices: number[] = [];
+    for (let i = 0; i < HERO_COUNT; i++) {
+      if (i % 8 === 0) keyIndices.push(i);
+      else fillIndices.push(i);
+    }
+    const keyTunnelIndices: number[] = [];
+    const fillTunnelIndices: number[] = [];
+    for (let i = 0; i < TUNNEL_COUNT; i++) {
+      if (i % 8 === 0) keyTunnelIndices.push(i);
+      else fillTunnelIndices.push(i);
+    }
+
+    const keyFrameCount = keyIndices.length + keyTunnelIndices.length;
+
+    function onLoad() {
+      loaded++;
+      const pct = Math.round((loaded / totalFrames) * 100);
       if (loadBar.current) loadBar.current.style.width = pct + '%';
       if (loadPct.current) loadPct.current.textContent = pct + '%';
 
-      if (ready.current.hero && ready.current.tunnel) {
+      // Hide overlay once key frames are ready (~25% loaded)
+      if (loaded === keyFrameCount) {
         if (loadOverlay.current) {
           loadOverlay.current.style.pointerEvents = 'none';
           loadOverlay.current.style.opacity = '0';
@@ -39,44 +111,47 @@ export default function FullPageCanvas() {
           }, 800);
         }
       }
-    };
-
-    const hero = heroRef.current;
-    const tunnel = tunnelRef.current;
-
-    if (hero) {
-      const onReady = () => { ready.current.hero = true; updateProgress(); };
-      hero.addEventListener('canplaythrough', onReady, { once: true });
-      // Also listen for 'loadeddata' as fallback (some browsers fire this first)
-      hero.addEventListener('loadeddata', onReady, { once: true });
-      if (hero.readyState >= 3) onReady();
-      hero.load();
     }
 
-    if (tunnel) {
-      const onReady = () => { ready.current.tunnel = true; updateProgress(); };
-      tunnel.addEventListener('canplaythrough', onReady, { once: true });
-      tunnel.addEventListener('loadeddata', onReady, { once: true });
-      if (tunnel.readyState >= 3) onReady();
-      tunnel.load();
+    function loadFrame(src: string, arr: HTMLImageElement[], idx: number) {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = onLoad;
+      img.onerror = onLoad; // count errors too
+      img.src = src;
+      arr[idx] = img;
     }
 
-    // Safety timeout — show content after 6s regardless
+    // Init arrays
+    heroFrames.current = new Array(HERO_COUNT);
+    tunnelFrames.current = new Array(TUNNEL_COUNT);
+
+    // Load key frames first
+    keyIndices.forEach((i) => loadFrame(heroPath(i), heroFrames.current, i));
+    keyTunnelIndices.forEach((i) => loadFrame(tunnelPath(i), tunnelFrames.current, i));
+
+    // Load fill frames after a short delay
+    setTimeout(() => {
+      fillIndices.forEach((i) => loadFrame(heroPath(i), heroFrames.current, i));
+      fillTunnelIndices.forEach((i) => loadFrame(tunnelPath(i), tunnelFrames.current, i));
+    }, 300);
+
+    // Safety timeout
     const timeout = setTimeout(() => {
-      ready.current.hero = true;
-      ready.current.tunnel = true;
-      updateProgress();
-    }, 6000);
+      if (loadOverlay.current && loadOverlay.current.style.display !== 'none') {
+        loadOverlay.current.style.pointerEvents = 'none';
+        loadOverlay.current.style.opacity = '0';
+        setTimeout(() => {
+          if (loadOverlay.current) loadOverlay.current.style.display = 'none';
+        }, 800);
+      }
+    }, 8000);
 
     return () => clearTimeout(timeout);
   }, []);
 
-  // ── Scroll-driven video scrubbing ─────────────────────────────────────────
+  // ── Scroll-driven frame painting ──────────────────────────────────────────
   useEffect(() => {
-    const hero = heroRef.current;
-    const tunnel = tunnelRef.current;
-    if (!hero || !tunnel) return;
-
     const onScroll = () => {
       scrollY.current = window.scrollY;
       docHeight.current = document.documentElement.scrollHeight - window.innerHeight;
@@ -85,35 +160,30 @@ export default function FullPageCanvas() {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
 
-    let lastKey = '';
-
     const loop = () => {
       const progress = docHeight.current > 0
         ? Math.min(1, Math.max(0, scrollY.current / docHeight.current))
         : 0;
 
+      let frameIndex: number;
+      let img: HTMLImageElement | undefined;
+
       if (progress < 0.5) {
+        // Hero phase
         const heroProgress = progress / 0.5;
-        const key = `h-${Math.round(heroProgress * 1000)}`;
-        if (key !== lastKey) {
-          lastKey = key;
-          hero.style.opacity = '1';
-          tunnel.style.opacity = '0';
-          if (hero.duration && ready.current.hero) {
-            hero.currentTime = heroProgress * hero.duration;
-          }
-        }
+        frameIndex = Math.min(HERO_COUNT - 1, Math.floor(heroProgress * HERO_COUNT));
+        img = heroFrames.current[frameIndex];
       } else {
+        // Tunnel phase
         const tunnelProgress = (progress - 0.5) / 0.5;
-        const key = `t-${Math.round(tunnelProgress * 1000)}`;
-        if (key !== lastKey) {
-          lastKey = key;
-          hero.style.opacity = '0';
-          tunnel.style.opacity = '1';
-          if (tunnel.duration && ready.current.tunnel) {
-            tunnel.currentTime = tunnelProgress * tunnel.duration;
-          }
-        }
+        frameIndex = Math.min(TUNNEL_COUNT - 1, Math.floor(tunnelProgress * TUNNEL_COUNT));
+        img = tunnelFrames.current[frameIndex];
+        frameIndex += HERO_COUNT; // unique key
+      }
+
+      if (frameIndex !== lastFrame.current && img?.complete && img.naturalWidth) {
+        lastFrame.current = frameIndex;
+        paint(img);
       }
 
       rafId.current = requestAnimationFrame(loop);
@@ -126,30 +196,18 @@ export default function FullPageCanvas() {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, []);
+  }, [paint]);
 
   return (
     <>
-      {/* Hero background video — scroll-driven, full quality 1920p */}
-      <video
-        ref={heroRef}
-        src="/hero-bg.mp4"
-        muted
-        playsInline
-        preload="auto"
-        className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
-        style={{ backgroundColor: '#0a0a0a' }}
-      />
-
-      {/* Tunnel background video — scroll-driven, full quality 1920p */}
-      <video
-        ref={tunnelRef}
-        src="/tunnel-bg.mp4"
-        muted
-        playsInline
-        preload="auto"
-        className="pointer-events-none fixed inset-0 z-0 h-screen w-screen object-cover"
-        style={{ backgroundColor: '#0a0a0a', opacity: 0 }}
+      {/* Fixed canvas — GPU composited */}
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          backgroundColor: '#0a0a0a',
+          willChange: 'transform',
+        }}
       />
 
       {/* Vignette */}
@@ -190,7 +248,7 @@ export default function FullPageCanvas() {
             style={{
               width: '0%', height: '100%',
               backgroundColor: '#C9B99A',
-              transition: 'width 0.3s linear',
+              transition: 'width 0.1s linear',
             }}
           />
         </div>
